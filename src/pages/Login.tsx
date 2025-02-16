@@ -86,38 +86,46 @@ const Login = () => {
     if (videoRef.current) {
       const canvas = document.createElement("canvas");
       
-      // Reduce the image size
-      const scaleFactor = 0.5;  // Adjust this to lower resolution further if needed
+      const scaleFactor = 0.5;
       canvas.width = videoRef.current.videoWidth * scaleFactor;
       canvas.height = videoRef.current.videoHeight * scaleFactor;
       
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const capturedImage = canvas.toDataURL("image/jpeg", 0.5); // JPEG format + compression
-  
-        setImage(capturedImage);
         
-        try {
-          const response = await fetch("http://localhost:5000/api/ocr", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ image: capturedImage }),
-          });
+        canvas.toBlob(async (blob) => {
+          if (!blob) return;
+          
+          const formData = new FormData();
+          formData.append("image", blob, "captured.jpg");
   
-          const data = await response.json();
-          if (response.ok) {
+          setImage(URL.createObjectURL(blob));
+  
+          try {
+            const response = await fetch("http://localhost:5000/api/ocr", {
+              method: "POST",
+              body: formData, // Sending as FormData (not JSON)
+            });
+  
+            const data = await response.json();
+  
+            if (!response.ok) {
+              throw new Error(data.error || "OCR extraction failed.");
+            }
+  
             setExtractedData(data);
-          } else {
-            alert("Failed to extract data.");
+          } catch (error: any) {
+            console.error("[OCR ERROR]", error.message);
+            setErrorMessage(error.message);
           }
-        } catch (error) {
-          console.error("Error extracting data:", error);
-        }
+        }, "image/jpeg");
       }
     }
     stopCamera();
   };
+  
+  
   
   // Stop Camera
   const stopCamera = () => {
